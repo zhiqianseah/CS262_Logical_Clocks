@@ -8,12 +8,20 @@ Created VirtualMachine class, and two VM.py to simulate 2 machines.
 
 Set up client and server connections in the VM. It works!
 
-Problem: How to get the third machine in?
-Problem: When/How to set the VM to receive the message during the run? --> figure out the interval runs first
+Problem 1: How to get the third machine in?
+Problem 2: When/How to set the VM to receive the message during the run? --> figure out the interval runs first
 
 So, try to get the VM to execute every X second. Found some help at: 
 http://stackoverflow.com/questions/474528/what-is-the-best-way-to-repeatedly-execute-a-function-every-x-seconds-in-python
 
 Got the VM to run in ticks. The way is to pause for the time difference between VM_time_interval and elapsed_time
 
-Next, moved the receiving_msg part to a separate thread, so that the VM can run independently of the receiving of messages
+Next, moved the receiving_msg part to a separate thread, so that the VM can run independently of the receiving of messages. Help with multi-threading code is taken from http://www.tutorialspoint.com/python/python_multithreading.htm. This should fix Problem 2.
+
+Problem 3: handle exception when one of the VM stops running and closes the socket
+
+Changed s.connect() to s.connect_ex() so that the VM will not crash/throw exception when the other VM has not booted up yet
+
+Fixed Problem 3 by putting a try-exception block in the receive thread
+
+Fixed Problem 1 trivially by creating a similar VM3.py. Got the 3 VMs to establish connection with each other in a round-table fashion

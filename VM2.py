@@ -1,5 +1,11 @@
 from VirtualMachine import VirtualMachine
-VM2 =VirtualMachine(2002, 2)
+
+#Create a VM with port number and the frequency of ticks
+VM2 =VirtualMachine(2002, 1)
+
+#connect to the other 2 VMs
+VM2.connect_to(2003)
+VM2.wait_for_connection()
 VM2.connect_to(2001)
 VM2.wait_for_connection()
 
