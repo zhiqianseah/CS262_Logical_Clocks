@@ -1,0 +1,19 @@
+Lab notes
+
+First, we tried to find some examples on client-server sockets online. Played around with a simple client-server example taken
+http://stackoverflow.com/questions/12993276/errno-10061-no-connection-could-be-made-because-the-target-machine-actively-re
+
+
+Created VirtualMachine class, and two VM.py to simulate 2 machines.
+
+Set up client and server connections in the VM. It works!
+
+Problem: How to get the third machine in?
+Problem: When/How to set the VM to receive the message during the run? --> figure out the interval runs first
+
+So, try to get the VM to execute every X second. Found some help at: 
+http://stackoverflow.com/questions/474528/what-is-the-best-way-to-repeatedly-execute-a-function-every-x-seconds-in-python
+
+Got the VM to run in ticks. The way is to pause for the time difference between VM_time_interval and elapsed_time
+
+Next, moved the receiving_msg part to a separate thread, so that the VM can run independently of the receiving of messages
