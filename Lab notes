@@ -25,3 +25,6 @@ Changed s.connect() to s.connect_ex() so that the VM will not crash/throw except
 Fixed Problem 3 by putting a try-exception block in the receive thread
 
 Fixed Problem 1 trivially by creating a similar VM3.py. Got the 3 VMs to establish connection with each other in a round-table fashion
+
+Feedback during class that python threads are not real threads, but separate processes, and hence not allowed in this homework. Put receive "thread" back to the main process, and listen on the socket in a non-blocking manner. This is done by 'socket.setblocking(False)' Help taken from
+http://stackoverflow.com/questions/16745409/what-does-pythons-socket-recv-return-for-non-blocking-sockets-if-no-data-is-r 
