@@ -5,6 +5,7 @@ import time
 VM3 =VirtualMachine(2003, 0.1)
 
 #connect to the other 2 VMs
+time.sleep(5) # wait until other VMs have started
 VM3.connect_to(2001)
 VM3.wait_for_connection(2002)
 time.sleep(2)
