@@ -1,7 +1,9 @@
 from VirtualMachine import VirtualMachine
 import time
+import random
+
 #Create a VM with port number and the frequency of ticks
-VM2 =VirtualMachine(2002, 0.1)
+VM2 =VirtualMachine(2002, random.randint(1, 6), 'VM2')
 
 #connect to the other 2 VMs
 time.sleep(5) # wait until other VMs have started

@@ -2,10 +2,12 @@ import socket
 import sched, time
 import random
 import errno
-
+import struct
+from collections import deque
+import os
 class VirtualMachine:
 
-    def __init__(self, port, ticks):
+    def __init__(self, port, ticks, name):
         self._hostSocket = socket.socket()         # Create a socket object
         self._interval = 1.0/ticks
         self._clientSockets = {}
@@ -13,9 +15,11 @@ class VirtualMachine:
         self._clientports = []
         host = '0.0.0.0'            # Get local machine name
         self._threadcounter = 0
+        self._name = name
+        self._clock = 0
+        self._maxR = 11 # Maximum for random number generator
 
         print 'VM started!'
-
 
         self._hostSocket.bind((host, port))        # Bind to the port
 
@@ -25,13 +29,11 @@ class VirtualMachine:
 
         print 'Waiting for clients...'
 
-
         while True:
             try:
                 self._hostSocket.listen(1)                 # Now wait for client connection.
                 c, addr = self._hostSocket.accept()     # Establish connection with client.
                 print 'Got connection from', addr
-
 
                 #set the receive socket as non-blocking
                 c.setblocking(False)
@@ -39,7 +41,6 @@ class VirtualMachine:
 
                 #once connection is established, break out of while loop
                 break;
-
             
             except socket.error, e:
                 pass
@@ -52,67 +53,105 @@ class VirtualMachine:
 
         print 'Connecting to ', host, port
 
-
         while(s.connect_ex((host, port))):
             pass
-
-
-        #msg = "hi"
-        #s.send(msg)
 
         self._clientports.append(port)
         self._clientSockets[port] = s
 
-    def send_msg(self, port, msg):
+    # Reference: http://stackoverflow.com/questions/17667903/python-socket-receive-large-amount-of-data
+    # ------------------------------------------
+    def send_msg(self, msg, client):
+        # Prefix each message with a 4-byte length (network byte order)
+        msg = struct.pack('>I', len(msg)) + msg
+        port = self._clientports[client]
         print "Sending message to:", port
         try:
-            self._clientSockets[port].send(msg)
+            self._clientSockets[port].sendall(msg)
         except:
             print "Enable to send message. Socket may be closed"
 
+    def recvall(self, n, client):
+        # Helper function to recv n bytes or return None if EOF is hit
+        data = ''
+        while len(data) < n:
+            packet = None
+            try:
+                packet = self._clientReceive[self._clientports[client]].recv(n - len(data))
+            except socket.error, e:
+                pass
+            if not packet:
+                return None
+            data += packet
+        return data
+
+    def recv_msg(self, client):
+        # Read message length and unpack it into an integer
+        raw_msglen = self.recvall(4, client)
+        if not raw_msglen:
+            return None
+        msglen = struct.unpack('>I', raw_msglen)[0]
+        # Read the message data
+        return self.recvall(msglen, client)
+
+    # ------------------------------------------
+
+    def addToMq(self, client, q):
+        while True:
+            msg = self.recv_msg(client)
+            if msg is None:
+                break
+            q.append((client, msg))
 
     def runVM(self, duration):
         start = time.time()
+        path, filename = os.path.split(os.path.realpath(__file__))
+        f = open(path + '/' + str(self._name)+'.log', 'w')
+        q = deque()
         while True:
+            # Add all messages from the socket into the message queue to be processed
+            self.addToMq(0, q)
+            self.addToMq(1, q)
 
+            # Update logical clock time for this virtual machine
+            self._clock += 1
 
-            #check for incoming messages in the socket
-            #TODO: put this in a message queue..?
-            try:
-                msg = self._clientReceive[self._clientports[0]].recv(4096)
-                print "message from", self._clientports[0], ":", msg
-            except socket.error, e:
-                pass
-                #err = e.args[0]
-                #if (err == errno.EAGAIN or err == errno.EWOULDBLOCK):
-                #    pass
+            # Process messages in the queue first
+            if q:
+                client, msg = q.popleft()
+                mqLen = len(q)
+                log_str = 'Message received from client #{} (port {}): {}\tQueue length: {}\tSys. time: {}\tLogical ' \
+                          'clock: {' \
+                          '}\n'.format(client, self._clientports[client], msg, mqLen, time.time(), self._clock)
+                f.write(log_str)
+                print log_str
 
-            try:
-                msg = self._clientReceive[self._clientports[1]].recv(4096)
-                print "message from", self._clientports[1], ":", msg
-            except socket.error, e:
-                pass
-                #err = e.args[0]
-                #if (err == errno.EAGAIN or err == errno.EWOULDBLOCK):
-                #    pass
+                # Update logical clocks
+                cmd, targets, l_clock = msg.split()
+                l_clock = int(l_clock)
+                if self._clock < l_clock + 1:
+                    print 'Updating clock from', self._clock, 'to', l_clock + 1
+                self._clock = max(self._clock, l_clock + 1)
+            else:
+                # Generate a random number to see next course of action
+                rand_num = random.randrange(1, self._maxR)
+                print "tick:", rand_num
+                if rand_num == 1:
+                    self.send_msg("Hello {} {}".format(rand_num, self._clock), 0)
+                elif rand_num == 2:
+                    self.send_msg("Hello {} {}".format(rand_num, self._clock), 1)
+                elif rand_num == 3:
+                    self.send_msg("Hello both {}".format(self._clock), 0)
+                    self.send_msg("Hello both {}".format(self._clock), 1)
+                else:
+                    log_str = 'Internal event\tSys. time: {}\tLogical Clock: {}\n'.format(time.time(), self._clock)
+                    f.write(log_str)
+                    print log_str
 
-
-
-
-            #generate a random number to see next course of action
-            rand_num = random.randrange(1, 11)
-            print "tick:", rand_num
-            if (rand_num == 1):
-                self.send_msg(self._clientports[0], "hi")
-            elif (rand_num == 2):
-                self.send_msg(self._clientports[1], "hi")
-            elif (rand_num == 3):
-                self.send_msg(self._clientports[0], "hi")
-                self.send_msg(self._clientports[1], "hi")
-
-            #stop the VM when the duration is up
+            # Stop the VM when the duration is up
             if (time.time() - start) > duration:
+                f.close()
                 break
 
-            #pause for the remainder of a tick
+            # Pause for the remainder of a tick
             time.sleep(self._interval - ((time.time() - start) % self._interval))
