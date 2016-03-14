@@ -75,15 +75,15 @@ If `P2` receives a message:
  	- It receives a message from `P3` and speed of`P3` > `P2`, or
  	- It receives a message from `P1` and `P1` was updated by a message from `P3` recently enough to have `P1`'s logical clock to still be higher than `P2`.
 
-If `P3 receives a message:
+If `P1` receives a message:
 
-	- There will be no jumps in its logical clock.
+ - There will be no jumps in its logical clock since it operates at least as fast as the other two VMs.
 
-If speed of `P1` = `P2` = `P3` then there will be no jumps in the logical clock time.
+If the speed of `P1` = `P2` = `P3` then there will be no jumps in the logical clock time for any VM.
 
 The frequency of the clock rate will also affect the size of the message queue. The bigger the difference, the larger the message queue tends to get since the slower VM will have paused during the time the faster VM has been sending out messages.
 
-### Smaller variation in clock rates and small probability of internal events
+### Smaller variation in clock rates and smaller probability of internal events
 
 Some key observations when we make these changes:
 
