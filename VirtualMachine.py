@@ -61,15 +61,22 @@ class VirtualMachine:
 
     # Reference: http://stackoverflow.com/questions/17667903/python-socket-receive-large-amount-of-data
     # ------------------------------------------
-    def send_msg(self, msg, client):
+    def send_msg(self, msg, client, log_f = None):
         # Prefix each message with a 4-byte length (network byte order)
         msg = struct.pack('>I', len(msg)) + msg
         port = self._clientports[client]
-        print "Sending message to:", port
+
         try:
             self._clientSockets[port].sendall(msg)
         except:
             print "Enable to send message. Socket may be closed"
+
+        log_str = 'Message sent to client #{} (port {}): {}\tSys. time: {}\tLogical ' \
+                          'clock: {}\n'.format(client, port, msg, time.time(), self._clock)
+        if log_f:
+            log_f.write(log_str)
+
+        print log_str
 
     def recvall(self, n, client):
         # Helper function to recv n bytes or return None if EOF is hit
@@ -97,16 +104,23 @@ class VirtualMachine:
     # ------------------------------------------
 
     def addToMq(self, client, q):
+        allM = []
         while True:
             msg = self.recv_msg(client)
             if msg is None:
                 break
+            _, _, l_clock = msg.split()
+            allM.append( (l_clock, msg) )
+
+        # Make sure we add earlier messages to the message queue first
+        for _, msg in sorted(allM):
             q.append((client, msg))
 
     def runVM(self, duration):
         start = time.time()
         path, filename = os.path.split(os.path.realpath(__file__))
         f = open(path + '/' + str(self._name)+'.log', 'w')
+        f.write('Tick interval (s): {}\n'.format(self._interval))
         q = deque()
         while True:
             # Add all messages from the socket into the message queue to be processed
@@ -120,29 +134,33 @@ class VirtualMachine:
             if q:
                 client, msg = q.popleft()
                 mqLen = len(q)
+                # Update logical clocks
+                cmd, targets, l_clock = msg.split()
+                l_clock = int(l_clock)
+                if self._clock < l_clock + 1:
+                    log_str = '\tUpdating clock from {} to {}\n'.format(self._clock, l_clock + 1)
+                    print log_str
+                    f.write(log_str)
+                    self._clock = l_clock + 1
+
                 log_str = 'Message received from client #{} (port {}): {}\tQueue length: {}\tSys. time: {}\tLogical ' \
                           'clock: {' \
                           '}\n'.format(client, self._clientports[client], msg, mqLen, time.time(), self._clock)
                 f.write(log_str)
                 print log_str
 
-                # Update logical clocks
-                cmd, targets, l_clock = msg.split()
-                l_clock = int(l_clock)
-                if self._clock < l_clock + 1:
-                    print 'Updating clock from', self._clock, 'to', l_clock + 1
-                self._clock = max(self._clock, l_clock + 1)
+
             else:
                 # Generate a random number to see next course of action
                 rand_num = random.randrange(1, self._maxR)
                 print "tick:", rand_num
                 if rand_num == 1:
-                    self.send_msg("Hello {} {}".format(rand_num, self._clock), 0)
+                    self.send_msg("Hello {} {}".format(rand_num, self._clock), 0, f)
                 elif rand_num == 2:
-                    self.send_msg("Hello {} {}".format(rand_num, self._clock), 1)
+                    self.send_msg("Hello {} {}".format(rand_num, self._clock), 1, f)
                 elif rand_num == 3:
-                    self.send_msg("Hello both {}".format(self._clock), 0)
-                    self.send_msg("Hello both {}".format(self._clock), 1)
+                    self.send_msg("Hello both {}".format(self._clock), 0, f)
+                    self.send_msg("Hello both {}".format(self._clock), 1, f)
                 else:
                     log_str = 'Internal event\tSys. time: {}\tLogical Clock: {}\n'.format(time.time(), self._clock)
                     f.write(log_str)
